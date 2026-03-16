@@ -33,11 +33,19 @@ The order book currently handles around 3.5 million orders per second with the m
 | Avg Throughput | 0.48M orders/sec |
 | Min Throughput | 0.22M orders/sec |
 
-The vector implementation underperformed despite better theoretical cache locality 
-because the O(n) element shifting on insertion dominated the O(log n) tree traversal 
-cost of the map. With prices clustered in a narrow range, the book maintains roughly 
-120 active price levels, meaning every insertion shifts up to 120 elements. 
-The cache benefit exists but is overwhelmed by this cost.
+The vector implementation underperformed despite better theoretical cache locality because the O(n) element shifting on insertion dominated the O(log n) tree traversal cost of the map. With prices clustered in a narrow range, the book maintains roughly 120 active price levels, meaning every insertion shifts up to 120 elements. The cache benefit exists but is overwhelmed by this cost.
+
+### Cache Analysis (vector implementation)
+Profiled using `valgrind --tool=cachegrind` on 1,000,000 orders.
+
+| Metric | Value |
+|--------|-------|
+| D1 cache miss rate | 0.016% |
+| LL cache miss rate | 0.003% |
+
+Despite the theoretical cache locality advantage of contiguous memory, cache misses were not the bottleneck. The vector's D1 miss rate of 0.016% confirms data was being served from cache efficiently. The performance regression was caused entirely by O(n) element shifting on insertion, every new price level requires shifting up to roughly 120 existing elements. The map's O(log n) tree traversal, despite pointer chasing, outperforms O(n) shifting for this workload size.
+
+This finding motivates the price ladder implementation, which eliminates shifting entirely with O(1) direct index calculation.
 
 # Running the application
 To run the application, first ensure that you have CMake installed.
