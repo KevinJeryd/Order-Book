@@ -12,7 +12,17 @@ To allow for quick deletion an additional unsorted map has been used for instant
 Using the ordered maps also allows for the instant querying of best bid, ask and spread.
 
 # Performance
-## std::map implementation
+## Current Implementation (Direct-Indexed Array)
+| Metric | Value |
+|--------|-------|
+| Min Time | 1762.5ms |
+| Avg Time | 2095.96ms |
+| Max Time | 4650.07ms |
+| Peak Throughput | 0.57M orders/sec |
+| Avg Throughput | 0.48M orders/sec |
+| Min Throughput | 0.22M orders/sec |
+
+## Previous Implementation (std::map)
 The order book currently handles around 3.5 million orders per second with the map implementation. See benchmark numbers below.
 | Metric | Value |
 |--------|-------|
