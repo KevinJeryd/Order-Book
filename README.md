@@ -23,7 +23,36 @@ The order book currently handles around 3.5 million orders per second with the m
 | Avg Throughput | 3.48M orders/sec |
 | Min Throughput | 3.38M orders/sec |
 
-## std::vector implementation
+# Running the application
+To run the application, first ensure that you have CMake installed.
+Following commands are done from project root.
+
+First of all, to generate the build files run `cmake -S . -B build`
+
+Building can be done by running `cmake --build build`
+
+Run the test through `./build/orderbook_tests`
+
+Run the benchmark through `./build/benchmark`
+
+
+# Optimization Experiments
+## Direct-indexed static array — Hypothesis
+The profiling data showed that the map's 0.2% cache miss rate was not a significant bottleneck. The real cost was the O(log n) tree traversal on every insertion and lookup. The direct-indexed static array implementation eliminates this entirely by using direct index calculation. Given a price, the index is computed as `price - base_price` in O(1) with no searching, no tree traversal, and no element shifting.
+
+Since prices cluster in a narrow range (roughly 120 ticks), a fixed array of 500 slots covers the realistic price range with room to spare. The array is contiguous in memory, so cache locality is maintained. Combined with O(1) insertion and lookup, the direct-indexed array should outperform both the map and the vector implementations.
+
+Only benchmarking will confirm this.
+
+## Vector Implementation — Hypothesis and Results (See branch for impl)
+### Hypothesis
+Currently the map implementation suffers from constant pointer chasing and cache misses, which leads to always having to fetch the next bid or ask in ram, even though we know it's the next one in line, since the map is ordered. To bypass these misses a sorted vector can be used instead. The vector implementation would fetch the entire cache line and put it into the L1 cache, which would make the upcoming asks and bids instantaneous. Furthermore, the CPUs prefetcher would detect a sequential access pattern and start loading the next cache line as well, removing the trips to ram entirely.
+
+However, worth mentioning, is that insertion will go from O(log n), which the maps underlying tree structure allows for, to O(n), since the array might have to move all the values to the right if inserting from a new best value. The argument for why the array still results in better performance despite its worse time complexity is that the number of price levels in a realistic scenario would be small enough that the cache miss reduction will make up for moving N elements.
+
+However, only benchmarking will show if this is true.
+
+### Results
 | Metric | Value |
 |--------|-------|
 | Min Time | 1762.5ms |
@@ -35,34 +64,16 @@ The order book currently handles around 3.5 million orders per second with the m
 
 The vector implementation underperformed despite better theoretical cache locality because the O(n) element shifting on insertion dominated the O(log n) tree traversal cost of the map. With prices clustered in a narrow range, the book maintains roughly 120 active price levels, meaning every insertion shifts up to 120 elements. The cache benefit exists but is overwhelmed by this cost.
 
-### Cache Analysis (vector implementation)
+### Cache Analysis Comparison
+
 Profiled using `valgrind --tool=cachegrind` on 1,000,000 orders.
 
-| Metric | Value |
-|--------|-------|
-| D1 cache miss rate | 0.016% |
-| LL cache miss rate | 0.003% |
+| Metric | std::map | sorted std::vector |
+|--------|----------|--------------------|
+| Total data references | 22.9 billion | 230 billion |
+| D1 cache miss rate | 0.2% | 0.016% |
+| LLd cache miss rate | 0.0% | 0.0% |
 
-Despite the theoretical cache locality advantage of contiguous memory, cache misses were not the bottleneck. The vector's D1 miss rate of 0.016% confirms data was being served from cache efficiently. The performance regression was caused entirely by O(n) element shifting on insertion, every new price level requires shifting up to roughly 120 existing elements. The map's O(log n) tree traversal, despite pointer chasing, outperforms O(n) shifting for this workload size.
+The vector implementation confirmed lower cache miss rates as predicted, validating the cache locality theory. However, the O(n) element shifting generated 10x more total memory operations, completely overwhelming the cache benefit. The map's 0.2% D1 miss rate, while higher, is still low in absolute terms — only 38 million misses across 22.9 billion references.
 
-This finding motivates the price ladder implementation, which eliminates shifting entirely with O(1) direct index calculation.
-
-# Running the application
-To run the application, first ensure that you have CMake installed.
-Following commands are done from project root.
-
-First of all, to generate the build files run ```cmake -S . -B build```
-
-Building can be done by running ```cmake --build build```
-
-Run the test through ```./build/orderbook_tests```
-
-Run the benchmark through ```./build/benchmark```
-
-
-# Next steps for further optimization
-Currently the map implementation suffers from constant pointer chasing and cache misses, which leads to always having to fetch the next bid or ask in ram, even though we know it's the next one in line, since the map is ordered. To bypass these misses a sorted vector can be used instead. The vector implementation would fetch the entire cache line and put it into the L1 cache, which would make the upcoming asks and bids instantaneous. Furthermore, the CPUs prefetcher would detect a sequential access pattern and start loading the next cache line as well, removing the trips to ram entirely.
-
-However, worth mentioning, is that insertion will go from O(log n), which the maps underlying tree structure allows for, to O(n), since the array might have to move all the values to the right if inserting from a new best value. The argument for why the array still results in better performance despite its worse time complexity is that the number of price levels in a realistic scenario would be small enough that the cache miss reduction will make up for moving N elements.
-
-However, only benchmarking will show if this is true.
+**Conclusion:** for this workload, reducing total memory operations matters more than reducing cache miss rate. The price ladder implementation targets both, O(1) insertion eliminates shifting, and contiguous memory maintains cache locality.
