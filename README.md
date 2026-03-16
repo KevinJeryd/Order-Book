@@ -12,7 +12,8 @@ To allow for quick deletion an additional unsorted map has been used for instant
 Using the ordered maps also allows for the instant querying of best bid, ask and spread.
 
 # Performance
-The order book currently handles around 3.5 million orders per second. See benchmark numbers below.
+## std::map implementation
+The order book currently handles around 3.5 million orders per second with the map implementation. See benchmark numbers below.
 | Metric | Value |
 |--------|-------|
 | Min Time | 283.35ms |
@@ -21,6 +22,22 @@ The order book currently handles around 3.5 million orders per second. See bench
 | Peak Throughput | 3.53M orders/sec |
 | Avg Throughput | 3.48M orders/sec |
 | Min Throughput | 3.38M orders/sec |
+
+## std::vector implementation
+| Metric | Value |
+|--------|-------|
+| Min Time | 1762.5ms |
+| Avg Time | 2095.96ms |
+| Max Time | 4650.07ms |
+| Peak Throughput | 0.57M orders/sec |
+| Avg Throughput | 0.48M orders/sec |
+| Min Throughput | 0.22M orders/sec |
+
+The vector implementation underperformed despite better theoretical cache locality 
+because the O(n) element shifting on insertion dominated the O(log n) tree traversal 
+cost of the map. With prices clustered in a narrow range, the book maintains roughly 
+120 active price levels, meaning every insertion shifts up to 120 elements. 
+The cache benefit exists but is overwhelmed by this cost.
 
 # Running the application
 To run the application, first ensure that you have CMake installed.
