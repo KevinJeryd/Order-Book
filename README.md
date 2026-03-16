@@ -43,7 +43,7 @@ Building can be done by running `cmake --build build`
 
 Run the test through `./build/orderbook_tests`
 
-Run the benchmark through `./build/benchmark`
+Run the benchmark through `./build/benchmark_direct`
 
 
 # Optimization Experiments
