@@ -13,19 +13,63 @@ void OrderBook::add_order(const Order &order) {
     if (remaining_quantity > 0) {
       Order updated_order = order;
       updated_order.quantity = remaining_quantity;
-      asks[order.price].push(updated_order);
+      asks[order.price].push_back(updated_order);
+      order_index.emplace(order.ID, OrderLocation{order.side, order.price});
     }
   } else {
     remaining_quantity = match_against(remaining_quantity, order, asks);
     if (remaining_quantity > 0) {
       Order updated_order = order;
       updated_order.quantity = remaining_quantity;
-      bids[order.price].push(updated_order);
+      bids[order.price].push_back(updated_order);
+      order_index.emplace(order.ID, OrderLocation{order.side, order.price});
     }
   }
 }
 
-void OrderBook::cancel_order(const OrderId order_id) {}
+bool OrderBook::cancel_order(const OrderId order_id) {
+  auto it = order_index.find(order_id);
+
+  if (it == order_index.end()) {
+    return false; // Order doesn't exist
+  }
+
+  OrderLocation order_location = it->second;
+
+  if (order_location.side == Side::ask) {
+    std::deque<Order> &orders = asks[order_location.price];
+
+    for (auto it = orders.begin(); it != orders.end(); ++it) {
+      if (it->ID == order_id) {
+        orders.erase(it);
+        break;
+      }
+    }
+
+    // Remove price point if all orders are consumed
+    if (orders.empty()) {
+      asks.erase(order_location.price);
+    }
+  } else {
+    std::deque<Order> &orders = bids[order_location.price];
+
+    for (auto it = orders.begin(); it != orders.end(); ++it) {
+      if (it->ID == order_id) {
+        orders.erase(it);
+        break;
+      }
+    }
+
+    // Remove price point if all orders are consumed
+    if (orders.empty()) {
+      bids.erase(order_location.price);
+    }
+  }
+
+  order_index.erase(order_id);
+
+  return true;
+}
 
 bool OrderBook::prices_cross(const Price bid, const Price ask) const {
   return bid >= ask;

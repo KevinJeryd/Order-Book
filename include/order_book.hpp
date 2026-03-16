@@ -2,9 +2,10 @@
 #define INCLUDE_ORDER_BOOK_HPP
 
 #include "types.hpp"
+#include <deque>
 #include <functional>
 #include <map>
-#include <queue>
+#include <unordered_map>
 
 namespace ob {
 
@@ -13,7 +14,7 @@ public:
   OrderBook(std::function<void(const Trade &)> trade_callback);
 
   void add_order(const Order &order);
-  void cancel_order(const OrderId order_id);
+  bool cancel_order(const OrderId order_id);
 
 private:
   bool prices_cross(const Price bid, const Price ask) const;
@@ -23,8 +24,15 @@ private:
   Quantity match_against(Quantity remaining, const Order &order,
                          Map &opposing_map);
 
-  std::map<Price, std::queue<Order>> asks;
-  std::map<Price, std::queue<Order>, std::greater<Price>> bids;
+  struct OrderLocation {
+    Side side;
+    Price price;
+  };
+
+  std::unordered_map<OrderId, OrderLocation> order_index;
+
+  std::map<Price, std::deque<Order>> asks;
+  std::map<Price, std::deque<Order>, std::greater<Price>> bids;
   std::function<void(const Trade &)> trade_callback;
 };
 
@@ -58,8 +66,10 @@ Quantity OrderBook::match_against(Quantity remaining, const Order &order,
 
       current_order.quantity -= fill;
 
+      // Remove resting order if fully consumed
       if (current_order.quantity == 0) {
-        best_level.pop();
+        order_index.erase(current_order.ID);
+        best_level.pop_front();
       }
     }
 
