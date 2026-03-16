@@ -1,4 +1,5 @@
 #include "../include/order_book.hpp"
+#include <algorithm>
 
 namespace ob {
 
@@ -13,7 +14,20 @@ void OrderBook::add_order(const Order &order) {
     if (remaining_quantity > 0) {
       Order updated_order = order;
       updated_order.quantity = remaining_quantity;
-      asks[order.price].push_back(updated_order);
+
+      // Find insert position for current price
+      auto it = std::lower_bound(
+          asks.begin(), asks.end(), order.price,
+          [](const PriceLevel &level, Price p) { return level.price < p; });
+
+      if (it != asks.end() && it->price == order.price) {
+        // Price level already exists, just push the order
+        it->orders.push_back(updated_order);
+      } else {
+        // Price level doesn't exist, insert a new one at this position
+        asks.insert(it, PriceLevel{order.price, {updated_order}});
+      }
+
       order_index.emplace(order.ID, OrderLocation{order.side, order.price});
     }
   } else {
@@ -21,7 +35,20 @@ void OrderBook::add_order(const Order &order) {
     if (remaining_quantity > 0) {
       Order updated_order = order;
       updated_order.quantity = remaining_quantity;
-      bids[order.price].push_back(updated_order);
+
+      // Find insert position for current price
+      auto it = std::lower_bound(
+          bids.begin(), bids.end(), order.price,
+          [](const PriceLevel &level, Price p) { return level.price > p; });
+
+      if (it != bids.end() && it->price == order.price) {
+        // Price level already exists, just push the order
+        it->orders.push_back(updated_order);
+      } else {
+        // Price level doesn't exist, insert a new one at this position
+        bids.insert(it, PriceLevel{order.price, {updated_order}});
+      }
+
       order_index.emplace(order.ID, OrderLocation{order.side, order.price});
     }
   }
@@ -37,32 +64,40 @@ bool OrderBook::cancel_order(const OrderId order_id) {
   OrderLocation order_location = it->second;
 
   if (order_location.side == Side::ask) {
-    std::deque<Order> &orders = asks[order_location.price];
+    auto level_it = std::lower_bound(
+        asks.begin(), asks.end(), order_location.price,
+        [](const PriceLevel &level, Price p) { return level.price < p; });
 
-    for (auto it = orders.begin(); it != orders.end(); ++it) {
-      if (it->ID == order_id) {
-        orders.erase(it);
+    auto &orders = level_it->orders;
+
+    for (auto order_it = orders.begin(); order_it != orders.end(); ++order_it) {
+      if (order_it->ID == order_id) {
+        orders.erase(order_it);
         break;
       }
     }
 
     // Remove price point if all orders are consumed
     if (orders.empty()) {
-      asks.erase(order_location.price);
+      asks.erase(level_it);
     }
   } else {
-    std::deque<Order> &orders = bids[order_location.price];
+    auto level_it = std::lower_bound(
+        bids.begin(), bids.end(), order_location.price,
+        [](const PriceLevel &level, Price p) { return level.price > p; });
 
-    for (auto it = orders.begin(); it != orders.end(); ++it) {
-      if (it->ID == order_id) {
-        orders.erase(it);
+    auto &orders = level_it->orders;
+
+    for (auto order_it = orders.begin(); order_it != orders.end(); ++order_it) {
+      if (order_it->ID == order_id) {
+        orders.erase(order_it);
         break;
       }
     }
 
     // Remove price point if all orders are consumed
     if (orders.empty()) {
-      bids.erase(order_location.price);
+      bids.erase(level_it);
     }
   }
 
@@ -76,7 +111,7 @@ Price OrderBook::best_bid() const {
     return -1;
   }
 
-  return bids.begin()->first;
+  return bids.front().price;
 }
 
 Price OrderBook::best_ask() const {
@@ -84,7 +119,7 @@ Price OrderBook::best_ask() const {
     return -1;
   }
 
-  return asks.begin()->first;
+  return asks.front().price;
 }
 
 Price OrderBook::spread() const {
@@ -92,7 +127,7 @@ Price OrderBook::spread() const {
     return -1;
   }
 
-  return asks.begin()->first - bids.begin()->first;
+  return asks.front().price - bids.front().price;
 }
 
 bool OrderBook::prices_cross(const Price bid, const Price ask) const {
