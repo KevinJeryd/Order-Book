@@ -15,12 +15,12 @@ Using the ordered maps also allows for the instant querying of best bid, ask and
 ## Current Implementation (Direct-Indexed Array)
 | Metric | Value |
 |--------|-------|
-| Min Time | 1762.5ms |
-| Avg Time | 2095.96ms |
-| Max Time | 4650.07ms |
-| Peak Throughput | 0.57M orders/sec |
-| Avg Throughput | 0.48M orders/sec |
-| Min Throughput | 0.22M orders/sec |
+| Min Time | 154.445ms |
+| Avg Time | 157.247ms |
+| Max Time | 163.611ms |
+| Peak Throughput | 6.47M orders/sec |
+| Avg Throughput | 6.36M orders/sec |
+| Min Throughput | 6.11M orders/sec |
 
 ## Previous Implementation (std::map)
 The order book currently handles around 3.5 million orders per second with the map implementation. See benchmark numbers below.
@@ -53,6 +53,24 @@ The profiling data showed that the map's 0.2% cache miss rate was not a signific
 Since prices cluster in a narrow range (roughly 120 ticks), a fixed array of 500 slots covers the realistic price range with room to spare. The array is contiguous in memory, so cache locality is maintained. Combined with O(1) insertion and lookup, the direct-indexed array should outperform both the map and the vector implementations.
 
 Only benchmarking will confirm this.
+
+### Results
+| Metric | Value |
+|--------|-------|
+| Min Time | 154.445ms |
+| Avg Time | 157.247ms |
+| Max Time | 163.611ms |
+| Peak Throughput | 6.47M orders/sec |
+| Avg Throughput | 6.36M orders/sec |
+| Min Throughput | 6.11M orders/sec |
+
+The direct-indexed array achieves O(1) insertion, lookup and deletion by computing the array index directly from the price: `index = price - base_price`. No tree traversal, no binary search, no element shifting, just a single subtraction.
+
+The best bid and ask indices are tracked explicitly, making `best_bid()` and `best_ask()` O(1) as well. When a price level is fully consumed, the next best is found by scanning adjacent slots, fast in practice since prices cluster tightly.
+
+The array resizes dynamically when prices go out of bounds, doubling in size and re-centering existing data. This is O(n) but happens rarely enough to be negligible.
+
+**Result:** 83% throughput improvement over the map implementation (3.53M to 6.47M orders/sec), with all core operations now O(1).
 
 ## Vector Implementation — Hypothesis and Results (See branch for impl)
 ### Hypothesis
