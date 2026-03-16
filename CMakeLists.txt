@@ -11,6 +11,13 @@ add_executable(orderbook
 
 target_include_directories(orderbook PRIVATE include)
 
+add_executable(benchmark
+    src/benchmark.cpp
+    src/order_book.cpp
+)
+
+target_include_directories(benchmark PRIVATE include)
+
 # Google Test
 include(FetchContent)
 FetchContent_Declare(
