@@ -18,6 +18,12 @@ add_executable(benchmark
 
 target_include_directories(benchmark PRIVATE include)
 
+add_executable(benchmark_direct
+    src/direct_indexed_book.cpp
+    src/main_direct.cpp
+)
+target_include_directories(benchmark_direct PRIVATE include)
+
 # Google Test
 include(FetchContent)
 FetchContent_Declare(
@@ -30,6 +36,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(orderbook_tests
     tests/order_book_test.cpp
     src/order_book.cpp
+    src/direct_indexed_book.cpp
 )
 
 target_include_directories(orderbook_tests PRIVATE include)
