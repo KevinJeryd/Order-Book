@@ -13,6 +13,7 @@ Using the ordered maps also allows for the instant querying of best bid, ask and
 
 # Performance
 ## Current Implementation (Direct-Indexed Array)
+The order book currently handles around 6.5 million orders per second with the direct-indexed implementation. See benchmark numbers below.
 | Metric | Value |
 |--------|-------|
 | Min Time | 154.445ms |
@@ -23,7 +24,6 @@ Using the ordered maps also allows for the instant querying of best bid, ask and
 | Min Throughput | 6.11M orders/sec |
 
 ## Previous Implementation (std::map)
-The order book currently handles around 3.5 million orders per second with the map implementation. See benchmark numbers below.
 | Metric | Value |
 |--------|-------|
 | Min Time | 283.35ms |
