@@ -108,4 +108,4 @@ Profiled using `valgrind --tool=cachegrind` on 1,000,000 orders.
 
 The vector implementation confirmed lower cache miss rates as predicted, validating the cache locality theory. However, the O(n) element shifting generated 10x more total memory operations, completely overwhelming the cache benefit. The map's 0.2% D1 miss rate, while higher, is still low in absolute terms — only 38 million misses across 22.9 billion references.
 
-**Conclusion:** for this workload, reducing total memory operations matters more than reducing cache miss rate. The price ladder implementation targets both, O(1) insertion eliminates shifting, and contiguous memory maintains cache locality.
+**Conclusion:** for this workload, reducing total memory operations matters more than reducing cache miss rate. The direct-indexed array implementation targets both, O(1) insertion eliminates shifting, and contiguous memory maintains cache locality.
