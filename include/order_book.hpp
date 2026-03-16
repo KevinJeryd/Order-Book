@@ -16,6 +16,10 @@ public:
   void add_order(const Order &order);
   bool cancel_order(const OrderId order_id);
 
+  Price best_bid() const;
+  Price best_ask() const;
+  Price spread() const;
+
 private:
   bool prices_cross(const Price bid, const Price ask) const;
   void emit_trade(const Price price, const Quantity quantity,

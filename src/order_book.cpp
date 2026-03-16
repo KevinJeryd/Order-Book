@@ -71,6 +71,30 @@ bool OrderBook::cancel_order(const OrderId order_id) {
   return true;
 }
 
+Price OrderBook::best_bid() const {
+  if (bids.empty()) {
+    return -1;
+  }
+
+  return bids.begin()->first;
+}
+
+Price OrderBook::best_ask() const {
+  if (asks.empty()) {
+    return -1;
+  }
+
+  return asks.begin()->first;
+}
+
+Price OrderBook::spread() const {
+  if (asks.empty() || bids.empty()) {
+    return -1;
+  }
+
+  return asks.begin()->first - bids.begin()->first;
+}
+
 bool OrderBook::prices_cross(const Price bid, const Price ask) const {
   return bid >= ask;
 }
