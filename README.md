@@ -1,15 +1,19 @@
 # Order Book
-High-performance C++ limit order book with a matching engine, benchmarked at 3.5M orders/sec.
+High-performance C++ limit order book with a matching engine, benchmarked at 6.5M orders/sec.
 
 # Overview
 An order book implementation for matching buyers and sellers, supporting both full and partial filling. Exposing a public API for adding and cancelling orders, as well as querying information such as current best bid, best ask and spread for analysis.
 
 # Architecture
-The order book's internal bids and asks container currently uses sorted maps with the price as key and a queue of the orders at that pricepoint as the underlying data structure for matching best bid and best ask in O(1) time and respecting time of order when several orders are put at the same price.
+The order book uses a direct-indexed array as the underlying data structure for both bids and asks. Each array slot corresponds to a price level, with the index computed as `price - base_price`. This gives O(1) insertion, lookup and deletion with no tree traversal, as in the previous map implementation, or element shifting as in the previous sorted vector implementation.
 
-To allow for quick deletion an additional unsorted map has been used for instant fetching of information that allows to locate the correct order. While fetching the correct map and key is instant, the implementation currently has to iterate to get the correct index in the queue for that price point, at most n times, where n is the length of the queue, if the order is at the furthest back of the queue. Since the queue is ordered in time, and not by order index, searching algorithms can't be used to decrease this time, for now.
+Each price level contains a deque of orders, maintaining FIFO priority where the oldest order at a price gets matched first.
 
-Using the ordered maps also allows for the instant querying of best bid, ask and spread.
+The best bid and ask indices are tracked explicitly as member variables, making `best_bid()`, `best_ask()` and `spread()` all O(1).
+
+For fast cancellation, a secondary hash map stores each order's location (side and price), giving O(1) lookup by order ID. Finding and removing the order within the price level's deque is O(n) where n is the number of orders at that price, typically very small in practice.
+
+The array resizes dynamically when prices go out of bounds, doubling in size and re-centering existing data around the new price range.
 
 # Performance
 ## Current Implementation (Direct-Indexed Array)
