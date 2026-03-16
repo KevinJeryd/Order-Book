@@ -44,6 +44,24 @@ Since prices cluster in a narrow range (roughly 120 ticks), a fixed array of 500
 
 Only benchmarking will confirm this.
 
+### Results
+| Metric | Value |
+|--------|-------|
+| Min Time | 154.445ms |
+| Avg Time | 157.247ms |
+| Max Time | 163.611ms |
+| Peak Throughput | 6.47M orders/sec |
+| Avg Throughput | 6.36M orders/sec |
+| Min Throughput | 6.11M orders/sec |
+
+The direct-indexed array achieves O(1) insertion, lookup and deletion by computing the array index directly from the price: `index = price - base_price`. No tree traversal, no binary search, no element shifting, just a single subtraction.
+
+The best bid and ask indices are tracked explicitly, making `best_bid()` and `best_ask()` O(1) as well. When a price level is fully consumed, the next best is found by scanning adjacent slots, fast in practice since prices cluster tightly.
+
+The array resizes dynamically when prices go out of bounds, doubling in size and re-centering existing data. This is O(n) but happens rarely enough to be negligible.
+
+**Result:** 83% throughput improvement over the map implementation (3.53M to 6.47M orders/sec), with all core operations now O(1).
+
 ## Vector Implementation — Hypothesis and Results (See branch for impl)
 ### Hypothesis
 Currently the map implementation suffers from constant pointer chasing and cache misses, which leads to always having to fetch the next bid or ask in ram, even though we know it's the next one in line, since the map is ordered. To bypass these misses a sorted vector can be used instead. The vector implementation would fetch the entire cache line and put it into the L1 cache, which would make the upcoming asks and bids instantaneous. Furthermore, the CPUs prefetcher would detect a sequential access pattern and start loading the next cache line as well, removing the trips to ram entirely.
